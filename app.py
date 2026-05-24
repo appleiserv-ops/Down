@@ -9,19 +9,22 @@ DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 
-def download_video(url, output):
+def run_download(url, out):
     cmd = [
         "yt-dlp",
-        "-f", "best",
-        "-o", output,
-        url
+        url,
+        "-f", "bv*+ba/best",
+        "--merge-output-format", "mp4",
+        "--no-playlist",
+        "--user-agent", "Mozilla/5.0",
+        "-o", out
     ]
     subprocess.run(cmd, check=True)
 
 
 @app.route("/")
 def home():
-    return "Downloader server is running"
+    return "Universal Downloader API running"
 
 
 @app.route("/download")
@@ -32,10 +35,10 @@ def download():
         return jsonify({"error": "no url"}), 400
 
     file_id = str(uuid.uuid4())
-    output_template = os.path.join(DOWNLOAD_DIR, file_id + ".%(ext)s")
+    output = os.path.join(DOWNLOAD_DIR, file_id + ".%(ext)s")
 
     try:
-        download_video(url, output_template)
+        run_download(url, output)
 
         for f in os.listdir(DOWNLOAD_DIR):
             if f.startswith(file_id):
