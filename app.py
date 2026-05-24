@@ -1,54 +1,68 @@
 from flask import Flask, request, send_file, jsonify
-import os
-import uuid
-import subprocess
+import os, uuid, subprocess
 
 app = Flask(__name__)
-
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 
-def run_download(url, out):
-    cmd = [
+def run_cmd(cmd):
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    return result
+
+
+def download(url, output):
+    base_cmd = [
         "yt-dlp",
         url,
         "-f", "bv*+ba/best",
         "--merge-output-format", "mp4",
         "--no-playlist",
+        "--force-ipv4",
         "--user-agent", "Mozilla/5.0",
-        "-o", out
+        "--extractor-retries", "3",
+        "--retry-sleep", "2",
+        "-o", output
     ]
-    subprocess.run(cmd, check=True)
+
+    r = run_cmd(base_cmd)
+
+    if r.returncode != 0:
+        return False, r.stderr
+
+    return True, None
 
 
 @app.route("/")
 def home():
-    return "Universal Downloader API running"
+    return "PRO downloader running"
 
 
 @app.route("/download")
-def download():
+def dl():
     url = request.args.get("url")
 
     if not url:
         return jsonify({"error": "no url"}), 400
 
+    url = url.strip()
+
     file_id = str(uuid.uuid4())
     output = os.path.join(DOWNLOAD_DIR, file_id + ".%(ext)s")
 
-    try:
-        run_download(url, output)
+    ok, err = download(url, output)
 
-        for f in os.listdir(DOWNLOAD_DIR):
-            if f.startswith(file_id):
-                path = os.path.join(DOWNLOAD_DIR, f)
-                return send_file(path, as_attachment=True)
+    if not ok:
+        return jsonify({
+            "error": "download failed",
+            "details": err
+        }), 500
 
-        return jsonify({"error": "file not found"}), 500
+    for f in os.listdir(DOWNLOAD_DIR):
+        if f.startswith(file_id):
+            return send_file(os.path.join(DOWNLOAD_DIR, f), as_attachment=True)
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"error": "file not found"}), 500
 
 
 if __name__ == "__main__":
