@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: downloader-server
+    name: pro-downloader
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
